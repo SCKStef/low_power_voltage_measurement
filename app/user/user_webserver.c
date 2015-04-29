@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2013-2014 Espressif Systems (Wuxi)
+ * Copyright 2013-2014 Espressif Systems 
  *
  * FileName: user_webserver.c
  *
@@ -24,9 +24,6 @@
 #include "user_esp_platform.h"
 #endif
 
-#if LIGHT_DEVICE
-#include "user_light.h"
-#endif
 
 LOCAL struct station_config *sta_conf;
 LOCAL struct softap_config *ap_conf;
@@ -56,19 +53,7 @@ device_get(struct jsontree_context *js_ctx)
     if (os_strncmp(path, "manufacture", 11) == 0) {
         jsontree_write_string(js_ctx, "Espressif Systems");
     } else if (os_strncmp(path, "product", 7) == 0) {
-#if SENSOR_DEVICE
-#if HUMITURE_SUB_DEVICE
         jsontree_write_string(js_ctx, "Humiture");
-#elif FLAMMABLE_GAS_SUB_DEVICE
-        jsontree_write_string(js_ctx, "Flammable Gas");
-#endif
-#endif
-#if PLUG_DEVICE
-        jsontree_write_string(js_ctx, "Plug");
-#endif
-#if LIGHT_DEVICE
-        jsontree_write_string(js_ctx, "Light");
-#endif
     }
 
     return 0;
@@ -184,139 +169,6 @@ JSONTREE_OBJECT(connect_status_tree,
 JSONTREE_OBJECT(con_status_tree,
                 JSONTREE_PAIR("info", &connect_status_tree));
 
-#if PLUG_DEVICE
-/******************************************************************************
- * FunctionName : status_get
- * Description  : set up the device status as a JSON format
- * Parameters   : js_ctx -- A pointer to a JSON set up
- * Returns      : result
-*******************************************************************************/
-LOCAL int ICACHE_FLASH_ATTR
-status_get(struct jsontree_context *js_ctx)
-{
-    if (user_plug_get_status() == 1) {
-        jsontree_write_int(js_ctx, 1);
-    } else {
-        jsontree_write_int(js_ctx, 0);
-    }
-
-    return 0;
-}
-
-/******************************************************************************
- * FunctionName : status_set
- * Description  : parse the device status parmer as a JSON format
- * Parameters   : js_ctx -- A pointer to a JSON set up
- *                parser -- A pointer to a JSON parser state
- * Returns      : result
-*******************************************************************************/
-LOCAL int ICACHE_FLASH_ATTR
-status_set(struct jsontree_context *js_ctx, struct jsonparse_state *parser)
-{
-    int type;
-
-    while ((type = jsonparse_next(parser)) != 0) {
-        if (type == JSON_TYPE_PAIR_NAME) {
-            if (jsonparse_strcmp_value(parser, "status") == 0) {
-                uint8 status;
-                jsonparse_next(parser);
-                jsonparse_next(parser);
-                status = jsonparse_get_value_as_int(parser);
-                user_plug_set_status(status);
-            }
-        }
-    }
-
-    return 0;
-}
-
-LOCAL struct jsontree_callback status_callback =
-    JSONTREE_CALLBACK(status_get, status_set);
-
-JSONTREE_OBJECT(status_tree,
-                JSONTREE_PAIR("status", &status_callback));
-JSONTREE_OBJECT(response_tree,
-                JSONTREE_PAIR("Response", &status_tree));
-JSONTREE_OBJECT(StatusTree,
-                JSONTREE_PAIR("switch", &response_tree));
-#endif
-
-#if LIGHT_DEVICE
-LOCAL int ICACHE_FLASH_ATTR
-light_status_get(struct jsontree_context *js_ctx)
-{
-    const char *path = jsontree_path_name(js_ctx, js_ctx->depth - 1);
-
-    if (os_strncmp(path, "red", 3) == 0) {
-        jsontree_write_int(js_ctx, user_light_get_duty(LIGHT_RED));
-    } else if (os_strncmp(path, "green", 5) == 0) {
-        jsontree_write_int(js_ctx, user_light_get_duty(LIGHT_GREEN));
-    } else if (os_strncmp(path, "blue", 4) == 0) {
-        jsontree_write_int(js_ctx, user_light_get_duty(LIGHT_BLUE));
-    } else if (os_strncmp(path, "freq", 4) == 0) {
-        jsontree_write_int(js_ctx, user_light_get_freq());
-    }
-
-    return 0;
-}
-
-LOCAL int ICACHE_FLASH_ATTR
-light_status_set(struct jsontree_context *js_ctx, struct jsonparse_state *parser)
-{
-    int type;
-
-    while ((type = jsonparse_next(parser)) != 0) {
-        if (type == JSON_TYPE_PAIR_NAME) {
-            if (jsonparse_strcmp_value(parser, "red") == 0) {
-                uint8 status;
-                jsonparse_next(parser);
-                jsonparse_next(parser);
-                status = jsonparse_get_value_as_int(parser);
-                //                os_printf("R: %d \n",status);
-                user_light_set_duty(status, LIGHT_RED);
-            } else if (jsonparse_strcmp_value(parser, "green") == 0) {
-                uint8 status;
-                jsonparse_next(parser);
-                jsonparse_next(parser);
-                status = jsonparse_get_value_as_int(parser);
-                //                os_printf("G: %d \n",status);
-                user_light_set_duty(status, LIGHT_GREEN);
-            } else if (jsonparse_strcmp_value(parser, "blue") == 0) {
-                uint8 status;
-                jsonparse_next(parser);
-                jsonparse_next(parser);
-                status = jsonparse_get_value_as_int(parser);
-                //                os_printf("B: %d \n",status);
-                user_light_set_duty(status, LIGHT_BLUE);
-            } else if (jsonparse_strcmp_value(parser, "freq") == 0) {
-                uint16 status;
-                jsonparse_next(parser);
-                jsonparse_next(parser);
-                status = jsonparse_get_value_as_int(parser);
-                //                os_printf("FREQ: %d \n",status);
-                user_light_set_freq(status);
-            }
-        }
-    }
-
-    user_light_restart();
-
-    return 0;
-}
-
-LOCAL struct jsontree_callback light_callback =
-    JSONTREE_CALLBACK(light_status_get, light_status_set);
-
-JSONTREE_OBJECT(rgb_tree,
-                JSONTREE_PAIR("red", &light_callback),
-                JSONTREE_PAIR("green", &light_callback),
-                JSONTREE_PAIR("blue", &light_callback));
-JSONTREE_OBJECT(sta_tree,
-                JSONTREE_PAIR("freq", &light_callback),
-                JSONTREE_PAIR("rgb", &rgb_tree));
-JSONTREE_OBJECT(PwmTree,
-                JSONTREE_PAIR("light", &sta_tree));
-#endif
 
 /******************************************************************************
  * FunctionName : wifi_station_get
@@ -970,19 +822,6 @@ json_send(void *arg, ParmType ParmType)
     struct espconn *ptrespconn = arg;
 
     switch (ParmType) {
-#if LIGHT_DEVICE
-
-        case LIGHT_STATUS:
-            json_ws_send((struct jsontree_value *)&PwmTree, "light", pbuf);
-            break;
-#endif
-
-#if PLUG_DEVICE
-
-        case SWITCH_STATUS:
-            json_ws_send((struct jsontree_value *)&StatusTree, "switch", pbuf);
-            break;
-#endif
 
         case INFOMATION:
             json_ws_send((struct jsontree_value *)&INFOTree, "info", pbuf);
@@ -1172,18 +1011,16 @@ LOCAL local_upgrade_deinit(void)
  *                length -- The length of upgrade data
  * Returns      : none
 *******************************************************************************/
-LOCAL void
-local_upgrade_download(void * arg,char *pusrdata, unsigned short length)
-{
-    char *ptr = NULL;
+LOCAL void local_upgrade_download(void * arg,char *pusrdata, unsigned short length) {
+    char *ptr   = NULL;
     char *ptmp2 = NULL;
     char lengthbuffer[32];
     static uint32 totallength = 0;
-    static uint32 sumlength = 0;
-    struct espconn *pespconn = arg;
+    static uint32 sumlength   = 0;
+    struct espconn *pespconn  = arg;
 
-    if (totallength == 0 && (ptr = (char *)os_strstr(pusrdata, "\r\n\r\n")) != NULL &&
-            (ptr = (char *)os_strstr(pusrdata, "Content-Length")) != NULL) {
+    if (totallength == 0 && (ptr = (char *)os_strstr(pusrdata, "\r\n\r\n"))!=NULL &&
+            (ptr=(char *)os_strstr(pusrdata, "Content-Length"))!=NULL) {
         ptr = (char *)os_strstr(pusrdata, "\r\n\r\n");
         length -= ptr - pusrdata;
         length -= 4;
@@ -1231,18 +1068,15 @@ local_upgrade_download(void * arg,char *pusrdata, unsigned short length)
  *                length -- The length of received data
  * Returns      : none
 *******************************************************************************/
-LOCAL void ICACHE_FLASH_ATTR
-webserver_recv(void *arg, char *pusrdata, unsigned short length)
-{
+LOCAL void ICACHE_FLASH_ATTR webserver_recv(void *arg, char *pusrdata, unsigned short length) {
     URL_Frame *pURL_Frame = NULL;
-    char *pParseBuffer = NULL;
-    bool parse_flag = false;
+    char *pParseBuffer    = NULL;
+    bool parse_flag       = false;
     struct espconn *ptrespconn = arg;
 	
-    if(upgrade_lock == 0){
-
+    if(upgrade_lock==0) {
     	parse_flag = save_data(pusrdata, length);
-        if (parse_flag == false) {
+        if (parse_flag==false) {
         	response_send(ptrespconn, false);
 			return;
         }
@@ -1311,19 +1145,6 @@ webserver_recv(void *arg, char *pusrdata, unsigned short length)
                         ap_conf = NULL;
                     }
 
-#if PLUG_DEVICE
-                    else if (os_strcmp(pURL_Frame->pFilename, "switch") == 0) {
-                        json_send(ptrespconn, SWITCH_STATUS);
-                    }
-
-#endif
-
-#if LIGHT_DEVICE
-                    else if (os_strcmp(pURL_Frame->pFilename, "light") == 0) {
-                        json_send(ptrespconn, LIGHT_STATUS);
-                    }
-
-#endif
 
                     else if (os_strcmp(pURL_Frame->pFilename, "reboot") == 0) {
                         json_send(ptrespconn, REBOOT);
@@ -1441,34 +1262,6 @@ webserver_recv(void *arg, char *pusrdata, unsigned short length)
                         }
                     }
 
-#if PLUG_DEVICE
-                    else if (os_strcmp(pURL_Frame->pFilename, "switch") == 0) {
-                        if (pParseBuffer != NULL) {
-                            struct jsontree_context js;
-                            jsontree_setup(&js, (struct jsontree_value *)&StatusTree, json_putchar);
-                            json_parse(&js, pParseBuffer);
-                            response_send(ptrespconn, true);
-                        } else {
-                            response_send(ptrespconn, false);
-                        }
-                    }
-
-#endif
-
-#if LIGHT_DEVICE
-                    else if (os_strcmp(pURL_Frame->pFilename, "light") == 0) {
-                        if (pParseBuffer != NULL) {
-                            struct jsontree_context js;
-
-                            jsontree_setup(&js, (struct jsontree_value *)&PwmTree, json_putchar);
-                            json_parse(&js, pParseBuffer);
-                            response_send(ptrespconn, true);
-                        } else {
-                            response_send(ptrespconn, false);
-                        }
-                    }
-
-#endif
                     else {
                         response_send(ptrespconn, false);
                     }
@@ -1539,11 +1332,8 @@ void webserver_recon(void *arg, sint8 err)
  * Parameters   : arg -- Additional argument to pass to the callback function
  * Returns      : none
 *******************************************************************************/
-LOCAL ICACHE_FLASH_ATTR
-void webserver_discon(void *arg)
-{
+LOCAL ICACHE_FLASH_ATTR void webserver_discon(void *arg) {
     struct espconn *pesp_conn = arg;
-
     os_printf("webserver's %d.%d.%d.%d:%d disconnect\n", pesp_conn->proto.tcp->remote_ip[0],
         		pesp_conn->proto.tcp->remote_ip[1],pesp_conn->proto.tcp->remote_ip[2],
         		pesp_conn->proto.tcp->remote_ip[3],pesp_conn->proto.tcp->remote_port);
@@ -1555,11 +1345,8 @@ void webserver_discon(void *arg)
  * Parameters   : arg -- Additional argument to pass to the callback function
  * Returns      : none
 *******************************************************************************/
-LOCAL void ICACHE_FLASH_ATTR
-webserver_listen(void *arg)
-{
+LOCAL void ICACHE_FLASH_ATTR webserver_listen(void *arg) {
     struct espconn *pesp_conn = arg;
-
     espconn_regist_recvcb(pesp_conn, webserver_recv);
     espconn_regist_reconcb(pesp_conn, webserver_recon);
     espconn_regist_disconcb(pesp_conn, webserver_discon);
@@ -1567,13 +1354,11 @@ webserver_listen(void *arg)
 
 /******************************************************************************
  * FunctionName : user_webserver_init
- * Description  : parameter initialize as a server
+ * Description  : parameter initialize as a webserver
  * Parameters   : port -- server port
  * Returns      : none
 *******************************************************************************/
-void ICACHE_FLASH_ATTR
-user_webserver_init(uint32 port)
-{
+void ICACHE_FLASH_ATTR user_webserver_init(uint32 port) {
     LOCAL struct espconn esp_conn;
     LOCAL esp_tcp esptcp;
 
